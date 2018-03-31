@@ -1,0 +1,122 @@
+#!/bin/bash
+
+#
+#
+# Program written by Nicholas Hawkins
+# CS 550 - James Madison University 
+# 
+#
+
+#Trap Control-C function to handle interrupt and end program
+trap ctrl_c INT
+
+# Function to capture interrupts; will remove temporary files
+function ctrl_c() {
+    echo "* Trapped CTRL-C. Program will now exit. *"
+    rm -rf thisCommand.txt
+    rm -rf lastCommand.txt
+    exit 1
+}
+
+# Set default parameter values
+TSECONDS=1
+COUNT=5
+PATTERNS=()
+
+# Capture the list of patterns
+for i
+do
+	# Capture t flag, discontinue capturing list of patterns
+	if  [ $i = "-t" ]; then
+    	break;
+   	# Capture t flag, discontinue capturing list of patterns
+    elif [ $i = "-n" ]; then
+    	break;
+    # Capture a pattern, shift the array of parameters
+    else
+    	PATTERNS+=($i)
+    	shift;
+    fi
+done
+
+
+# Capture parameters defined in command with flags -n or -t
+while getopts :t:n: option
+do
+ case "${option}"
+ in
+ t) TSECONDS=${OPTARG};;
+ n) COUNT=${OPTARG};;
+ ?) echo "Incorrect Command."; echo "Usage: bash spy [list of patterns] [-t tseconds] [-n count]"; echo "Quitting."; exit;
+ esac
+done
+
+
+> lastCommand.txt;
+> thisCommand.txt;
+
+# Print all running processes and date every (tseconds) for a total of (count) times
+ii=1
+while [ $ii -le $COUNT ]
+	do 
+		# Print new line and date
+		echo "";
+		date;
+
+		# Get all processes when a list of patterns is not provided
+		if [ ${#PATTERNS[@]} = 0 ]; then
+			ps -o user,pid,command | awk 'NR>1' > thisCommand.txt;
+		# Get processes with specific patterns when provided
+		else
+			for i in "${PATTERNS[@]}"
+			do
+				ps -o user,pid,command | grep $i | awk 'NR>1' >> thisCommand.txt;
+			done
+
+		fi
+
+
+		# Search for new processes that have started since last scan of process table
+
+		# Iterate through each line in the current process table
+		while read -r line
+		do
+		    # Iterate through each line in the previous process table to see if it doesn't exists
+		    	# If it doesn't exist, then it's a new process
+		    if ! grep -Fxq "$line" lastCommand.txt
+		    then
+		    	echo "Started: $line";
+		    fi
+		done < <(cat thisCommand.txt); 
+	
+
+		# Search for processes that have ended since last scan of process table
+
+		# Iterate through each line in the previous process table
+		while read -r line
+		do
+			# Iterate through each line in the current process table to see if it doesn't exists
+		    	# If it doesn't exist, then the process has ended 
+		    if ! grep -Fxq "$line" thisCommand.txt
+		    then
+		    	echo "Ended: $line";
+		    fi
+
+		done < <(cat lastCommand.txt);
+
+
+		# Print current process table output (thisCommand.txt) to intermediate file 
+			# tracking previous scan of process table (lastCommand.txt)
+		mv thisCommand.txt lastCommand.txt;
+		(( ii++ ))
+		sleep $TSECONDS; 
+done
+
+
+# Exit program successfully
+echo "Program is written by Nicholas Hawkins"
+exit
+
+
+# Done statement for CTRL-C trap
+done
